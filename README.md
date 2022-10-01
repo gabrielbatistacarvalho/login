@@ -1,1 +1,1 @@
-git
+Este projeto tem como objetivo desenvolver um login utilizando as tecnologias do JWT para validação.
