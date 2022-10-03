@@ -13,10 +13,47 @@ app.use(express.json())
 // Models
 const User = require('./models/User')
 
+// Open Route - Public route
 app.get('/', (req, res) => {
     console.log('Estamos conectados!')
     res.status(200).json({ message: 'Estamos conectados!' })
 })
+
+// private Route
+app.get('/user/:id', checkToken, async (req, res) => {
+    const id = req.params.id
+
+    // check if user exists
+    const user = await User.findById(id, '-password')
+
+    if(!user) {
+        return res.status(404).json({ msg: 'Usuário não encontrado' })
+    }
+
+    res.status(200).json({ user })
+})
+
+function checkToken(req, res, next) {
+
+    const authHeader = req.headers['authorization']
+    const token = authHeader && authHeader.split(' ')[1]
+
+    if(!token) {
+        return res.status(401).json({ msg: 'Acesso negado' })
+    }
+
+    try {
+        
+        const secret = process.env.SECRET
+
+        jwt.verify(token, secret)
+
+        next()
+        
+    } catch (error) {
+        return res.status(400).json({ msg: 'Token inválido' })
+    }
+}
 
 // Register User
 app.post('/auth/register', async(req, res) => {
@@ -41,13 +78,13 @@ app.post('/auth/register', async(req, res) => {
         return res.status(422).json({ msg: 'A senha é obrigatória!' })
     }
 
-    if(password != confirmpassword) {    
+    if(password !== confirmpassword) {    
         return res.status(422).json({ msg: 'As senhas não conferem!' })
     }
 
     // Check if user exists
-    const userExists = await User.findOne({ email: email })
-/*
+    const userExists = await User.findOne ({ email: email })
+
     if(userExists) {
         return res.status(422).json({ msg: 'Por favor, utilize outro e-mail!' })
     }
@@ -60,7 +97,7 @@ app.post('/auth/register', async(req, res) => {
     const user = new User({
         name,
         email,
-        password
+        password: passwordHash
     })
 
     try {
@@ -74,6 +111,62 @@ app.post('/auth/register', async(req, res) => {
         console.log(error)
         res.status(500).json({ msg: 'Erro no servidor!' })
 
+    }
+})
+
+app.post('/auth/login', async(req, res) => {
+    const {
+        email,
+        password
+    } = req.body
+
+    //const passwordHash = bcrypt.compare()
+
+    
+    // validations
+    if(!email) {
+        return res.status(422).json({ msg: 'O email é obrigatório!' })
+    }
+    // validations
+    if(!password) {
+        return res.status(422).json({ msg: 'A senha é obrigatória!' })
+    }
+
+    const user = await User.findOne({ email: email })
+    
+    // validations
+    if(!user) {
+        return res.status(404).json({ msg: 'Usuário não encontrado' })
+    }
+
+    const checkPassword = await bcrypt.compare(password, user.password)
+
+    // Check if user exists
+    if(!checkPassword) {
+        return res.status(422).json({ msg: 'Senha inválida!' })
+    }
+
+    try {
+        
+        const secret = process.env.secret
+        const token = jwt.sign({
+                id: user._id,
+            },
+            secret,
+        )
+
+        res.status(200).json({ msg: 'Autenticação realizada como sucesso', token})
+
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ msg: 'Erro no servidor!' })
+    }
+
+    /*
+    else {
+
+        console.log('Login efetuado com sucesso!')
+        res.status(201).json({ msg: 'Login efetuado com sucesso!' })
     }*/
 })
 
